@@ -1,8 +1,8 @@
-# `lib` 目录说明
+# `lib` Directory Guide
 
-`lib` 是应用核心源码目录，主要分成入口、数据层、界面层三部分。
+`lib` contains the core application source code. It is mainly split into the entry point, data layer, and UI layer.
 
-## 结构
+## Structure
 
 ```text
 lib/
@@ -14,26 +14,26 @@ lib/
 |- ui/
 ```
 
-## 主要职责
+## Responsibilities
 
 - `main.dart`
-  - 应用入口
-  - 初始化 `ProviderScope`
-  - 配置 `MaterialApp` 主题与首页
+  - Application entry point
+  - Initializes `ProviderScope`
+  - Configures the `MaterialApp` theme and home screen
 
 - `data/`
-  - 数据库表结构
-  - 本地 SQLite 连接
-  - Riverpod provider
-  - 支出与分类查询逻辑
+  - Database schema
+  - Local SQLite connection
+  - Riverpod providers
+  - Expense and category query logic
 
 - `ui/`
-  - 页面
-  - 可复用 UI 组件
-  - 用户交互逻辑
+  - Screens
+  - Reusable UI components
+  - User interaction logic
 
-## 维护建议
+## Maintenance Notes
 
-- 新业务优先按“数据层 / 页面层”拆分，不要把数据库操作直接散落到多个页面中。
-- 生成文件如 `*.g.dart` 不要手改，应通过 `build_runner` 重新生成。
-- 如果后续功能继续增加，建议把 `ui/` 再拆成 `screens/`、`widgets/`，把页面和组件分开。
+- Prefer splitting new features by data layer and UI layer instead of scattering database operations across screens.
+- Do not edit generated files such as `*.g.dart`; regenerate them with `build_runner`.
+- If the project grows further, consider splitting `ui/` into `screens/` and `widgets/`.
