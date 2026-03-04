@@ -1,44 +1,44 @@
-# `lib/ui` 目录说明
+# `lib/ui` Directory Guide
 
-这里存放页面和界面组件。
+This directory contains screens and UI components.
 
-## 文件职责
+## File Responsibilities
 
 - `home_screen.dart`
-  - 首页
-  - 时间筛选
-  - 分类筛选
-  - 支出列表
-  - 饼图与总额展示
+  - Home screen
+  - Date filtering
+  - Category filtering
+  - Expense list
+  - Pie chart and total display
 
 - `add_expense_screen.dart`
-  - 新增支出
-  - 编辑支出
-  - 删除单条支出
+  - Add a new expense
+  - Edit an existing expense
+  - Delete a single expense
 
 - `category_manager_screen.dart`
-  - 分类管理
-  - 数据备份
-  - 数据恢复
+  - Category management
+  - Data backup
+  - Data restore
 
 - `category_pie_chart.dart`
-  - 分类占比饼图
-  - 总支出 / 日均支出切换展示
+  - Category spending pie chart
+  - Toggle between total spending and daily average
 
 - `category_summary_bar.dart`
-  - 分类汇总条
-  - 当前首页未直接使用，可视作备用组件
+  - Category summary bar
+  - Not currently used directly on the home screen; can be treated as a spare component
 
-## 当前交互特点
+## Current Interaction Notes
 
-- 首页支持 `Month / Year / Custom` 三种时间模式。
-- 支出列表支持左滑删除。
-- 分类标签支持点击筛选，再次点击可取消。
-- 编辑支出时会回填金额、分类、日期、备注。
-- 分类管理页支持导出 `db.sqlite` 和从文件恢复。
+- The home screen supports `Month`, `Year`, and `Custom` filter modes.
+- The expense list supports swipe-to-delete.
+- Category chips can be tapped to filter and tapped again to clear the filter.
+- Editing an expense pre-fills amount, category, date, and note.
+- The category management screen supports exporting `db.sqlite` and restoring from a file.
 
-## 维护建议
+## Maintenance Notes
 
-- 页面文件目前职责偏多，后续可以把筛选栏、列表项、分类筛选条拆成独立 widget。
-- `home_screen.dart` 已经承担较多展示和状态逻辑，继续扩展前建议先拆分。
-- 恢复数据库属于高风险操作，后续可以增加文件校验、格式说明和更明确的恢复成功状态处理。
+- Some screen files already carry multiple responsibilities; consider extracting the filter bar, list items, and category filter row into separate widgets.
+- `home_screen.dart` holds a fair amount of presentation and state logic already, so it should be split before further expansion.
+- Database restore is a high-risk action; later improvements could include file validation, format checks, and clearer success handling.

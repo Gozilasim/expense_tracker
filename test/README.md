@@ -1,23 +1,23 @@
-# `test` 目录说明
+# `test` Directory Guide
 
-这里用于放自动化测试。
+This directory is intended for automated tests.
 
-## 当前状态
+## Current Status
 
-- 现有 [widget_test.dart](widget_test.dart) 还是 Flutter 模板自带的计数器测试。
-- 这个测试和当前记账应用界面不匹配，直接运行大概率不能反映真实功能状态。
+- The existing [widget_test.dart](widget_test.dart) is still the default Flutter counter test.
+- It does not match the current expense tracker UI and is unlikely to reflect real application behavior.
 
-## 建议优先补的测试
+## Tests Worth Adding First
 
-- 新增支出是否成功写入数据库
-- 编辑支出是否正确更新
-- 删除支出是否生效
-- 按月、按年、自定义区间筛选是否正确
-- 分类新增、编辑、删除逻辑是否正常
-- 备份与恢复流程的基本可用性
+- Verify that adding an expense writes to the database correctly
+- Verify that editing an expense updates the record correctly
+- Verify that deleting an expense works as expected
+- Verify month, year, and custom date-range filtering
+- Verify category add, edit, and delete flows
+- Verify basic backup and restore behavior
 
-## 推荐方向
+## Recommended Direction
 
-- 纯数据逻辑优先做单元测试
-- 页面交互做 widget test
-- 备份恢复这类流程可考虑做集成测试
+- Use unit tests first for pure data logic
+- Use widget tests for screen interaction
+- Consider integration tests for backup and restore flows
