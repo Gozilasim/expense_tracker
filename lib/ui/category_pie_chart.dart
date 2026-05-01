@@ -7,7 +7,8 @@ class CategoryPieChart extends StatefulWidget {
   final List<ExpenseWithCategory> expenses;
   final int totalDays;
 
-  const CategoryPieChart({super.key, required this.expenses, required this.totalDays});
+  const CategoryPieChart(
+      {super.key, required this.expenses, required this.totalDays});
 
   @override
   State<CategoryPieChart> createState() => _CategoryPieChartState();
@@ -20,29 +21,28 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
   @override
   Widget build(BuildContext context) {
     // We remove the empty check return to allow showing "0" or just empty chart with average 0
-    // But keeping it for now if expenses is empty, average is 0 anyway. 
+    // But keeping it for now if expenses is empty, average is 0 anyway.
     // Wait, if expenses is empty, we might still want to show "0"
     // The previous code returned "No data".
     // Let's keep "No data" if no expenses, but maybe users want to see "Daily Prev: 0"?
     // Let's stick to existing behavior for empty list first, but logic needs to be robust.
-    
+
     if (widget.expenses.isEmpty) {
-       // If no expenses, just show 0? Or the "No Data" widget?
-       // The user request is about logic.
-       // Let's keep "No data" for empty states for now.
-       return const SizedBox(
-        height: 300, 
-        child: Center(
-          child: Text("No data for this period", style: TextStyle(color: Colors.grey))
-        )
-      );
+      // If no expenses, just show 0? Or the "No Data" widget?
+      // The user request is about logic.
+      // Let's keep "No data" for empty states for now.
+      return const SizedBox(
+          height: 300,
+          child: Center(
+              child: Text("No data for this period",
+                  style: TextStyle(color: Colors.grey))));
     }
 
     // 1. Calculations
     final Map<int, double> totals = {};
     final Map<int, Category> categoryMap = {};
     double grandTotal = 0;
-    
+
     for (var item in widget.expenses) {
       final id = item.category.id;
       totals[id] = (totals[id] ?? 0) + item.expense.amount;
@@ -77,7 +77,8 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                       touchedIndex = -1;
                       return;
                     }
-                    touchedIndex = pieTouchResponse.touchedSection!.touchedSectionIndex;
+                    touchedIndex =
+                        pieTouchResponse.touchedSection!.touchedSectionIndex;
                   });
                 },
               ),
@@ -87,7 +88,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
               sections: showingSections(sortedEntries, categoryMap, grandTotal),
             ),
           ),
-          
+
           // The Interactive Center
           GestureDetector(
             onTap: () {
@@ -101,17 +102,17 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    showDailyAverage ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_up, 
-                    size: 24, 
-                    color: Colors.grey[400]
-                  ),
+                      showDailyAverage
+                          ? Icons.keyboard_arrow_up
+                          : Icons.keyboard_arrow_up,
+                      size: 24,
+                      color: Colors.grey[400]),
                   Text(
                     displayLabel,
                     style: const TextStyle(
-                      fontSize: 14, 
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500
-                    ),
+                        fontSize: 14,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500),
                   ),
                   const SizedBox(height: 2),
                   Text(
@@ -123,10 +124,11 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                     ),
                   ),
                   Icon(
-                    showDailyAverage ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_down, 
-                    size: 24, 
-                    color: Colors.grey[400]
-                  ),
+                      showDailyAverage
+                          ? Icons.keyboard_arrow_down
+                          : Icons.keyboard_arrow_down,
+                      size: 24,
+                      color: Colors.grey[400]),
                 ],
               ),
             ),
@@ -143,18 +145,18 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
   ) {
     return List.generate(entries.length, (i) {
       final isTouched = i == touchedIndex;
-      final fontSize = isTouched ? 25.0 : 16.0;
       final radius = isTouched ? 40.0 : 30.0;
       final entry = entries[i];
       final category = categoryMap[entry.key]!;
       final percent = (entry.value / grandTotal * 100).toStringAsFixed(0);
-      
+
       return PieChartSectionData(
         color: Color(category.color),
         value: entry.value,
         title: '', // No internal title
         radius: radius,
-        badgeWidget: isTouched ? _buildBadge(category, entry.value, percent) : null,
+        badgeWidget:
+            isTouched ? _buildBadge(category, entry.value, percent) : null,
         badgePositionPercentageOffset: 1.3, // Outside the ring
       );
     });
@@ -178,8 +180,14 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(category.name, style: TextStyle(color: Color(category.color), fontSize: 10, fontWeight: FontWeight.bold)),
-          Text('\$${amount.toStringAsFixed(0)} ($percent%)', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(category.name,
+              style: TextStyle(
+                  color: Color(category.color),
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold)),
+          Text('\$${amount.toStringAsFixed(0)} ($percent%)',
+              style:
+                  const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
         ],
       ),
     );

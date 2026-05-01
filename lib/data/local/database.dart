@@ -10,7 +10,8 @@ part 'database.g.dart';
 class Categories extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
-  TextColumn get icon => text().nullable()(); // Store icon code point or asset path
+  TextColumn get icon =>
+      text().nullable()(); // Store icon code point or asset path
   IntColumn get color => integer()(); // Store color value
 }
 
@@ -26,22 +27,23 @@ class Expenses extends Table {
 @DriftDatabase(tables: [Expenses, Categories])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
+  AppDatabase.forTesting(QueryExecutor executor) : super(executor);
 
   @override
   int get schemaVersion => 1;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (m) async {
-      await m.createAll();
-      await into(categories).insert(
-        CategoriesCompanion.insert(name: 'General', color: 0xFF9E9E9E),
+        onCreate: (m) async {
+          await m.createAll();
+          await into(categories).insert(
+            CategoriesCompanion.insert(name: 'General', color: 0xFF9E9E9E),
+          );
+        },
+        beforeOpen: (details) async {
+          await customStatement('PRAGMA foreign_keys = ON');
+        },
       );
-    },
-    beforeOpen: (details) async {
-      await customStatement('PRAGMA foreign_keys = ON');
-    },
-  );
 }
 
 LazyDatabase _openConnection() {

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import '../data/ocr_api_settings.dart';
 import '../data/providers.dart';
 import '../data/local/database.dart';
 
@@ -13,11 +14,21 @@ class CategoryManagerScreen extends ConsumerStatefulWidget {
   const CategoryManagerScreen({super.key});
 
   @override
-  ConsumerState<CategoryManagerScreen> createState() => _CategoryManagerScreenState();
+  ConsumerState<CategoryManagerScreen> createState() =>
+      _CategoryManagerScreenState();
 }
 
 class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
-  
+  final _apiUrlController = TextEditingController();
+  String? _lastLoadedApiUrl;
+  bool _isSavingApiUrl = false;
+
+  @override
+  void dispose() {
+    _apiUrlController.dispose();
+    super.dispose();
+  }
+
   Future<void> _backupData() async {
     try {
       final dbFolder = await getApplicationDocumentsDirectory();
@@ -26,15 +37,18 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
 
       if (!await file.exists()) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No database found to backup!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No database found to backup!')));
         return;
       }
 
       // Share expects XFile
-      await Share.shareXFiles([XFile(dbPath)], text: 'Expense Tracker Backup (db.sqlite)');
+      await Share.shareXFiles([XFile(dbPath)],
+          text: 'Expense Tracker Backup (db.sqlite)');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Backup failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Backup failed: $e')));
     }
   }
 
@@ -51,9 +65,12 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Restore Backup?'),
-            content: const Text('WARNING: This will overwritten ALL current data. This action cannot be undone.\n\nAre you sure you want to restore?'),
+            content: const Text(
+                'WARNING: This will overwritten ALL current data. This action cannot be undone.\n\nAre you sure you want to restore?'),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+              TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -66,25 +83,82 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
         if (confirm == true) {
           // Overwrite the file
           await File(sourcePath).copy(dbPath);
-          
+
           // Invalidate providers to force reload/re-open logic if possible
           ref.invalidate(databaseProvider);
           ref.invalidate(categoriesProvider);
           ref.invalidate(expensesProvider);
 
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Restored successfully! Restarting app is recommended.')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text(
+                  'Restored successfully! Restarting app is recommended.')));
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Restore failed: $e')));
+    }
+  }
+
+  Future<void> _saveApiUrl() async {
+    final trimmed = _apiUrlController.text.trim();
+    if (trimmed.isNotEmpty && parseStoredOcrApiUrl(trimmed) == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid full http/https API URL.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingApiUrl = true;
+    });
+
+    try {
+      await ref.read(ocrApiUrlControllerProvider.notifier).save(trimmed);
+      if (!mounted) return;
+
+      final message = trimmed.isEmpty
+          ? 'OCR Backend API URL cleared.'
+          : 'OCR Backend API URL saved.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save API URL: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingApiUrl = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
+    final ocrApiUrlAsync = ref.watch(ocrApiUrlControllerProvider);
+    final loadedApiUrl = ocrApiUrlAsync.valueOrNull;
+
+    if (loadedApiUrl != _lastLoadedApiUrl) {
+      _lastLoadedApiUrl = loadedApiUrl;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _apiUrlController.value = TextEditingValue(
+          text: loadedApiUrl ?? '',
+          selection: TextSelection.collapsed(
+            offset: (loadedApiUrl ?? '').length,
+          ),
+        );
+      });
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -99,13 +173,21 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
               const PopupMenuItem(
                 value: 'backup',
                 child: Row(
-                  children: [Icon(Icons.upload, color: Colors.grey), SizedBox(width: 8), Text('Backup Data (Export)')],
+                  children: [
+                    Icon(Icons.upload, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Backup Data (Export)')
+                  ],
                 ),
               ),
               const PopupMenuItem(
                 value: 'restore',
                 child: Row(
-                  children: [Icon(Icons.download, color: Colors.grey), SizedBox(width: 8), Text('Restore Data (Import)')],
+                  children: [
+                    Icon(Icons.download, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Restore Data (Import)')
+                  ],
                 ),
               ),
             ],
@@ -114,19 +196,70 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
       ),
       body: categoriesAsync.when(
         data: (categories) {
-           return Column(
-             children: [
-               // Header
-               Container(
-                 width: double.infinity,
-                 padding: const EdgeInsets.all(16),
-                 color: Colors.grey[100],
-                 child: const Text("CATEGORIES", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-               ),
-               Expanded(
-                 child: categories.isEmpty
-                     ? const Center(child: Text('No categories available.'))
-                     : ListView.builder(
+          return Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: Colors.grey[100],
+                child: const Text(
+                  "OCR IMPORT",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: Colors.grey),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _apiUrlController,
+                      keyboardType: TextInputType.url,
+                      decoration: const InputDecoration(
+                        labelText: 'OCR Backend API URL',
+                        hintText: 'https://api.example.com/ocr/import',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Save the full backend API URL used for OCR/LLM receipt imports.',
+                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                    ),
+                    if (ocrApiUrlAsync.hasError) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Failed to load saved API URL: ${ocrApiUrlAsync.error}',
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        onPressed: _isSavingApiUrl ? null : _saveApiUrl,
+                        child: Text(
+                          _isSavingApiUrl ? 'Saving...' : 'Save API URL',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: Colors.grey[100],
+                child: const Text("CATEGORIES",
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.grey)),
+              ),
+              Expanded(
+                child: categories.isEmpty
+                    ? const Center(child: Text('No categories available.'))
+                    : ListView.builder(
                         itemCount: categories.length,
                         itemBuilder: (context, index) {
                           final category = categories[index];
@@ -136,12 +269,15 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                               color: Colors.red,
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 16),
-                              child: const Icon(Icons.delete, color: Colors.white),
+                              child:
+                                  const Icon(Icons.delete, color: Colors.white),
                             ),
                             direction: DismissDirection.endToStart,
                             onDismissed: (_) {
                               final db = ref.read(databaseProvider);
-                              (db.delete(db.categories)..where((t) => t.id.equals(category.id))).go();
+                              (db.delete(db.categories)
+                                    ..where((t) => t.id.equals(category.id)))
+                                  .go();
                             },
                             child: ListTile(
                               leading: CircleAvatar(
@@ -149,46 +285,60 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                                 foregroundColor: Colors.white,
                                 radius: 20,
                                 child: Icon(
-                                  category.icon != null 
-                                    ? IconData(int.tryParse(category.icon!) ?? Icons.attach_money.codePoint, fontFamily: 'MaterialIcons')
-                                    : Icons.attach_money,
+                                  category.icon != null
+                                      ? IconData(
+                                          int.tryParse(category.icon!) ??
+                                              Icons.attach_money.codePoint,
+                                          fontFamily: 'MaterialIcons')
+                                      : Icons.attach_money,
                                   size: 20,
                                 ),
                               ),
                               title: Text(category.name),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.grey),
+                                icon: const Icon(Icons.delete,
+                                    color: Colors.grey),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('Delete Category?'),
-                                      content: Text('Delete "${category.name}"? Related expenses might be affected.'),
+                                      content: Text(
+                                          'Delete "${category.name}"? Related expenses might be affected.'),
                                       actions: [
-                                        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
                                         TextButton(
-                                          onPressed: () => Navigator.pop(context, true),
-                                          style: TextButton.styleFrom(foregroundColor: Colors.red),
-                                          child: const Text('Delete')
-                                        ),
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('Cancel')),
+                                        TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            style: TextButton.styleFrom(
+                                                foregroundColor: Colors.red),
+                                            child: const Text('Delete')),
                                       ],
                                     ),
                                   );
 
                                   if (confirm == true) {
-                                     final db = ref.read(databaseProvider);
-                                     (db.delete(db.categories)..where((t) => t.id.equals(category.id))).go();
+                                    final db = ref.read(databaseProvider);
+                                    (db.delete(db.categories)
+                                          ..where(
+                                              (t) => t.id.equals(category.id)))
+                                        .go();
                                   }
                                 },
                               ),
-                              onTap: () => _showCategoryDialog(context, ref, categories, categoryToEdit: category),
+                              onTap: () => _showCategoryDialog(
+                                  context, ref, categories,
+                                  categoryToEdit: category),
                             ),
                           );
                         },
                       ),
-               ),
-             ],
-           );
+              ),
+            ],
+          );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, s) => Center(child: Text('Error: $e')),
@@ -205,14 +355,12 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
   }
 
   void _showCategoryDialog(
-    BuildContext context, 
-    WidgetRef ref, 
-    List<Category> existingCategories, 
-    {Category? categoryToEdit}
-  ) {
+      BuildContext context, WidgetRef ref, List<Category> existingCategories,
+      {Category? categoryToEdit}) {
     final isEditing = categoryToEdit != null;
-    final controller = TextEditingController(text: isEditing ? categoryToEdit.name : '');
-    
+    final controller =
+        TextEditingController(text: isEditing ? categoryToEdit.name : '');
+
     // Curated palette
     final List<Color> palette = [
       ...Colors.primaries,
@@ -222,12 +370,11 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     ];
 
     // Initial color
-    int selectedColorValue = isEditing 
-        ? categoryToEdit.color 
-        : palette.first.value;
+    int selectedColorValue =
+        isEditing ? categoryToEdit.color : palette.first.value;
 
     // Available Icons
-    const List<IconData> _availableIcons = [
+    const List<IconData> availableIcons = [
       Icons.attach_money,
       Icons.fastfood,
       Icons.restaurant,
@@ -252,156 +399,188 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
 
     int selectedIconCodePoint = isEditing && categoryToEdit.icon != null
         ? int.tryParse(categoryToEdit.icon!) ?? Icons.attach_money.codePoint
-        : _availableIcons.first.codePoint;
+        : availableIcons.first.codePoint;
 
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(isEditing ? 'Edit Category' : 'New Category'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: controller,
-                      decoration: const InputDecoration(
-                        labelText: 'Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      autofocus: true,
+        return StatefulBuilder(builder: (context, setState) {
+          return AlertDialog(
+            title: Text(isEditing ? 'Edit Category' : 'New Category'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration: const InputDecoration(
+                      labelText: 'Name',
+                      border: OutlineInputBorder(),
                     ),
-                    const SizedBox(height: 16),
-                    const Align(alignment: Alignment.centerLeft, child: Text("Pick a Color:")),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: palette.map((color) {
-                        final isSelected = color.value == selectedColorValue;
-                        // Check usage
-                        final isUsed = existingCategories.any((c) => 
-                          c.color == color.value && 
-                          (categoryToEdit == null || c.id != categoryToEdit.id) // Ignore self if editing
-                        );
+                    autofocus: true,
+                  ),
+                  const SizedBox(height: 16),
+                  const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Pick a Color:")),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: palette.map((color) {
+                      final isSelected = color.value == selectedColorValue;
+                      // Check usage
+                      final isUsed = existingCategories.any((c) =>
+                              c.color == color.value &&
+                              (categoryToEdit == null ||
+                                  c.id !=
+                                      categoryToEdit
+                                          .id) // Ignore self if editing
+                          );
+
+                      return GestureDetector(
+                        onTap: isUsed
+                            ? null
+                            : () {
+                                setState(() {
+                                  selectedColorValue = color.value;
+                                });
+                              },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: color,
+                            shape: BoxShape.circle,
+                            border: isSelected
+                                ? Border.all(color: Colors.black, width: 2)
+                                : null,
+                            // Dim if used
+                            boxShadow: isUsed
+                                ? null
+                                : [
+                                    if (isSelected)
+                                      const BoxShadow(
+                                          color: Colors.black26, blurRadius: 4)
+                                  ],
+                          ),
+                          child: isUsed
+                              ? Icon(Icons.block,
+                                  size: 16,
+                                  color: Colors.white.withOpacity(0.5))
+                              : (isSelected
+                                  ? const Icon(Icons.check,
+                                      size: 16, color: Colors.white)
+                                  : null),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text("Pick an Icon:")),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 150, // Limit height for grid
+                    width: double.maxFinite,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey[300]!),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: GridView.builder(
+                      padding: const EdgeInsets.all(8),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 5,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                      ),
+                      itemCount: availableIcons.length,
+                      itemBuilder: (context, index) {
+                        final iconData = availableIcons[index];
+                        final isSelected =
+                            selectedIconCodePoint == iconData.codePoint;
 
                         return GestureDetector(
-                          onTap: isUsed ? null : () {
+                          onTap: () {
                             setState(() {
-                              selectedColorValue = color.value;
+                              selectedIconCodePoint = iconData.codePoint;
                             });
                           },
                           child: Container(
-                            width: 32, 
-                            height: 32,
                             decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: isSelected ? Border.all(color: Colors.black, width: 2) : null,
-                              // Dim if used
-                              boxShadow: isUsed ? null : [
-                                if (isSelected) BoxShadow(color: Colors.black26, blurRadius: 4)
-                              ],
+                              color: isSelected
+                                  ? Color(selectedColorValue).withOpacity(0.2)
+                                  : Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                              border: isSelected
+                                  ? Border.all(
+                                      color: Color(selectedColorValue),
+                                      width: 2)
+                                  : null,
                             ),
-                            child: isUsed 
-                              ? Icon(Icons.block, size: 16, color: Colors.white.withOpacity(0.5)) 
-                              : (isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null),
+                            child: Icon(
+                              iconData,
+                              color: isSelected
+                                  ? Color(selectedColorValue)
+                                  : Colors.grey,
+                            ),
                           ),
                         );
-                      }).toList(),
+                      },
                     ),
-                    const SizedBox(height: 16),
-                    const Align(alignment: Alignment.centerLeft, child: Text("Pick an Icon:")),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 150, // Limit height for grid
-                      width: double.maxFinite,
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(8),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                        ),
-                        itemCount: _availableIcons.length,
-                        itemBuilder: (context, index) {
-                          final iconData = _availableIcons[index];
-                          final isSelected = selectedIconCodePoint == iconData.codePoint;
-                          
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedIconCodePoint = iconData.codePoint;
-                              });
-                            },
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: isSelected ? Color(selectedColorValue).withOpacity(0.2) : Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                                border: isSelected ? Border.all(color: Color(selectedColorValue), width: 2) : null,
-                              ),
-                              child: Icon(
-                                iconData,
-                                color: isSelected ? Color(selectedColorValue) : Colors.grey,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                FilledButton(
-                  onPressed: () {
-                    final name = controller.text.trim();
-                    if (name.isEmpty) return;
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () {
+                  final name = controller.text.trim();
+                  if (name.isEmpty) return;
 
-                    // Final Validation
-                    final isColorTaken = existingCategories.any((c) => 
-                        c.color == selectedColorValue && 
-                        (categoryToEdit == null || c.id != categoryToEdit.id)
+                  // Final Validation
+                  final isColorTaken = existingCategories.any((c) =>
+                      c.color == selectedColorValue &&
+                      (categoryToEdit == null || c.id != categoryToEdit.id));
+
+                  if (isColorTaken) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Color already taken! Please pick another.')),
                     );
+                    return;
+                  }
 
-                    if (isColorTaken) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Color already taken! Please pick another.')),
-                      );
-                      return;
-                    }
+                  final db = ref.read(databaseProvider);
 
-                    final db = ref.read(databaseProvider);
-                    
-                    if (isEditing) {
-                      (db.update(db.categories)..where((t) => t.id.equals(categoryToEdit.id)))
+                  if (isEditing) {
+                    (db.update(db.categories)
+                          ..where((t) => t.id.equals(categoryToEdit.id)))
                         .write(CategoriesCompanion(
+                      name: drift.Value(name),
+                      color: drift.Value(selectedColorValue),
+                      icon: drift.Value(selectedIconCodePoint.toString()),
+                    ));
+                  } else {
+                    db.into(db.categories).insert(CategoriesCompanion(
                           name: drift.Value(name),
                           color: drift.Value(selectedColorValue),
                           icon: drift.Value(selectedIconCodePoint.toString()),
                         ));
-                    } else {
-                      db.into(db.categories).insert(CategoriesCompanion(
-                        name: drift.Value(name),
-                        color: drift.Value(selectedColorValue),
-                        icon: drift.Value(selectedIconCodePoint.toString()),
-                      ));
-                    }
-                    Navigator.pop(context);
-                  },
-                  child: Text(isEditing ? 'Save' : 'Add'),
-                ),
-              ],
-            );
-          }
-        );
+                  }
+                  Navigator.pop(context);
+                },
+                child: Text(isEditing ? 'Save' : 'Add'),
+              ),
+            ],
+          );
+        });
       },
     );
   }
