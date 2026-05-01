@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import '../data/ocr_api_settings.dart';
 import '../data/providers.dart';
+import '../data/receipt_ocr.dart';
 import '../data/local/database.dart'; // Need Expense type
 import 'add_expense_screen.dart';
 import 'category_manager_screen.dart';
 import 'category_pie_chart.dart';
+import 'receipt_import_review_screen.dart';
 
 enum FilterMode { monthly, yearly, custom }
 
@@ -21,6 +25,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   DateTime _focusedDate = DateTime.now(); // For Month/Year modes
   DateTimeRange? _customRange; // For Custom mode
   int? _selectedCategoryId; // Null = Show All
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -28,9 +33,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Default custom range to today if ever needed
     final now = DateTime.now();
     _customRange = DateTimeRange(
-      start: DateTime(now.year, now.month, now.day), 
-      end: DateTime(now.year, now.month, now.day, 23, 59, 59)
-    );
+        start: DateTime(now.year, now.month, now.day),
+        end: DateTime(now.year, now.month, now.day, 23, 59, 59));
   }
 
   void _onModeChanged(FilterMode? mode) {
@@ -51,7 +55,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       } else if (_filterMode == FilterMode.yearly) {
         _focusedDate = DateTime(_focusedDate.year - 1);
       }
-      _selectedCategoryId = null; // Optional: Reset category filter when changing date
+      _selectedCategoryId =
+          null; // Optional: Reset category filter when changing date
     });
   }
 
@@ -68,19 +73,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _pickDateRange() async {
     final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2030),
-      initialDateRange: _customRange,
-      builder: (context, child) {
-         return Theme(
-           data: Theme.of(context).copyWith(
-             colorScheme: const ColorScheme.light(primary: Colors.black),
-           ),
-           child: child!,
-         );
-      }
-    );
+        context: context,
+        firstDate: DateTime(2020),
+        lastDate: DateTime(2030),
+        initialDateRange: _customRange,
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: const ColorScheme.light(primary: Colors.black),
+            ),
+            child: child!,
+          );
+        });
 
     if (picked != null) {
       setState(() {
@@ -95,7 +99,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     switch (_filterMode) {
       case FilterMode.monthly:
         final start = DateTime(_focusedDate.year, _focusedDate.month, 1);
-        final end = DateTime(_focusedDate.year, _focusedDate.month + 1, 0, 23, 59, 59);
+        final end =
+            DateTime(_focusedDate.year, _focusedDate.month + 1, 0, 23, 59, 59);
         return DateTimeRange(start: start, end: end);
       case FilterMode.yearly:
         final start = DateTime(_focusedDate.year, 1, 1);
@@ -115,11 +120,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case FilterMode.custom:
         final start = _customRange!.start;
         final end = _customRange!.end;
-        if (start.year == end.year && start.month == end.month && start.day == end.day) {
+        if (start.year == end.year &&
+            start.month == end.month &&
+            start.day == end.day) {
           return DateFormat('MMM d, y').format(start);
         }
         return '${DateFormat('MMM d').format(start)} - ${DateFormat('MMM d').format(end)}';
     }
+  }
+
+  Future<ImageSource?> _pickReceiptImageSource() {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_camera),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose From Gallery'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _scanReceipt() async {
+    if (_isScanning) return;
+
+    final apiUrlState = ref.read(ocrApiUrlControllerProvider);
+    final savedApiUrl = apiUrlState.valueOrNull;
+
+    if (apiUrlState.isLoading) {
+      _showMessage('Loading saved OCR API URL. Try again in a moment.');
+      return;
+    }
+
+    final apiUrl = parseStoredOcrApiUrl(savedApiUrl);
+    if (apiUrl == null) {
+      _showMessage('Set your OCR Backend API URL first.');
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
+      );
+      return;
+    }
+
+    final imageSource = await _pickReceiptImageSource();
+    if (imageSource == null) return;
+
+    final imagePicker = ImagePicker();
+    final imageFile = await imagePicker.pickImage(
+      source: imageSource,
+      imageQuality: 85,
+    );
+    if (imageFile == null) return;
+
+    setState(() {
+      _isScanning = true;
+    });
+
+    try {
+      final categories = await ref.read(categoriesProvider.future);
+      final entries = await ref.read(receiptOcrApiClientProvider).scanReceipt(
+            apiUrl: apiUrl,
+            imageFile: imageFile,
+            categories: categories,
+          );
+
+      if (!mounted) return;
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ReceiptImportReviewScreen(
+            entries: entries,
+            categories: categories,
+          ),
+        ),
+      );
+    } catch (error) {
+      _showMessage(error.toString());
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -127,6 +227,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final currentRange = _getCurrentRange();
     // Use the optimized provider with SQL filtering
     final expensesAsync = ref.watch(expensesProvider(dateRange: currentRange));
+    final ocrApiUrlAsync = ref.watch(ocrApiUrlControllerProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -136,7 +237,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CategoryManagerScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const CategoryManagerScreen()),
               );
             },
           ),
@@ -145,21 +247,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: expensesAsync.when(
         data: (dateFilteredItems) {
           // 1. Filter by Category (for the List below)
-          final displayItems = _selectedCategoryId == null 
-              ? dateFilteredItems 
-              : dateFilteredItems.where((e) => e.category.id == _selectedCategoryId).toList();
+          final displayItems = _selectedCategoryId == null
+              ? dateFilteredItems
+              : dateFilteredItems
+                  .where((e) => e.category.id == _selectedCategoryId)
+                  .toList();
 
           final groupedItems = _groupExpenses(displayItems);
-          
+
           // Calculate Totals based on DATE filtered items (DateFiltered is the source of truth for the chart/breakdown)
-          final totalAmount = dateFilteredItems.fold<double>(0, (sum, item) => sum + item.expense.amount);
+          final totalAmount = dateFilteredItems.fold<double>(
+              0, (sum, item) => sum + item.expense.amount);
 
           return CustomScrollView(
             slivers: [
               // 1. FILTER BAR
               SliverToBoxAdapter(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   color: Colors.grey[50],
                   child: Row(
                     children: [
@@ -167,49 +273,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         value: _filterMode,
                         underline: const SizedBox(),
                         icon: const Icon(Icons.arrow_drop_down, size: 20),
-                        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, color: Colors.black87),
                         onChanged: _onModeChanged,
                         items: const [
-                          DropdownMenuItem(value: FilterMode.monthly, child: Text('Month')),
-                          DropdownMenuItem(value: FilterMode.yearly, child: Text('Year')),
-                          DropdownMenuItem(value: FilterMode.custom, child: Text('Custom')),
+                          DropdownMenuItem(
+                              value: FilterMode.monthly, child: Text('Month')),
+                          DropdownMenuItem(
+                              value: FilterMode.yearly, child: Text('Year')),
+                          DropdownMenuItem(
+                              value: FilterMode.custom, child: Text('Custom')),
                         ],
                       ),
                       const Spacer(),
                       if (_filterMode != FilterMode.custom) ...[
                         IconButton(
-                          icon: const Icon(Icons.chevron_left), 
+                          icon: const Icon(Icons.chevron_left),
                           onPressed: _previous,
                           visualDensity: VisualDensity.compact,
                         ),
                         Text(
                           _getDisplayDate(),
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.chevron_right), 
+                          icon: const Icon(Icons.chevron_right),
                           onPressed: _next,
                           visualDensity: VisualDensity.compact,
                         ),
                       ] else ...[
-                         GestureDetector(
-                           onTap: _pickDateRange,
-                           child: Container(
-                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                             decoration: BoxDecoration(
-                               border: Border.all(color: Colors.grey[300]!),
-                               borderRadius: BorderRadius.circular(8),
-                               color: Colors.white
-                             ),
-                             child: Row(
-                               children: [
-                                 const Icon(Icons.calendar_today, size: 14),
-                                 const SizedBox(width: 8),
-                                 Text(_getDisplayDate()),
-                               ],
-                             ),
-                           ),
-                         ),
+                        GestureDetector(
+                          onTap: _pickDateRange,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(8),
+                                color: Colors.white),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.calendar_today, size: 14),
+                                const SizedBox(width: 8),
+                                Text(_getDisplayDate()),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ],
                   ),
@@ -219,13 +330,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // 2. TOTAL TEXT
               SliverToBoxAdapter(
                 child: Padding(
-                   padding: const EdgeInsets.only(bottom: 8),
-                   child: Center(
-                     child: Text(
-                       'Total: \$${totalAmount.toStringAsFixed(2)}',
-                       style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.bold),
-                     ),
-                   ),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Center(
+                    child: Text(
+                      'Total: \$${totalAmount.toStringAsFixed(2)}',
+                      style: TextStyle(
+                          color: Colors.grey[700], fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
               ),
 
@@ -266,7 +378,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                           child: Text(
                             item.text,
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 14),
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey,
+                                fontSize: 14),
                           ),
                         );
                       } else if (item is ExpenseItem) {
@@ -274,34 +389,52 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         final category = item.data.category;
                         return Dismissible(
                           key: Key(expense.id.toString()),
-                          background: Container(color: Colors.red, alignment: Alignment.centerRight, child: const Padding(padding: EdgeInsets.only(right: 16), child: Icon(Icons.delete, color: Colors.white))),
+                          background: Container(
+                              color: Colors.red,
+                              alignment: Alignment.centerRight,
+                              child: const Padding(
+                                  padding: EdgeInsets.only(right: 16),
+                                  child:
+                                      Icon(Icons.delete, color: Colors.white))),
                           direction: DismissDirection.endToStart,
                           onDismissed: (_) async {
-                             final db = ref.read(databaseProvider);
-                             await (db.delete(db.expenses)..where((t) => t.id.equals(expense.id))).go();
+                            final db = ref.read(databaseProvider);
+                            await (db.delete(db.expenses)
+                                  ..where((t) => t.id.equals(expense.id)))
+                                .go();
                           },
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor: Color(category.color), 
-                              radius: 18, 
-                              child: Icon(
-                                category.icon != null 
-                                  ? IconData(int.tryParse(category.icon!) ?? Icons.attach_money.codePoint, fontFamily: 'MaterialIcons')
-                                  : Icons.attach_money,
-                                color: Colors.white, 
-                                size: 20
-                              )
-                            ),
+                                backgroundColor: Color(category.color),
+                                radius: 18,
+                                child: Icon(
+                                    category.icon != null
+                                        ? IconData(
+                                            int.tryParse(category.icon!) ??
+                                                Icons.attach_money.codePoint,
+                                            fontFamily: 'MaterialIcons')
+                                        : Icons.attach_money,
+                                    color: Colors.white,
+                                    size: 20)),
                             title: Text(
-                              expense.note?.isNotEmpty == true ? expense.note! : category.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              expense.note?.isNotEmpty == true
+                                  ? expense.note!
+                                  : category.name,
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              '${category.name} • ${DateFormat.jm().format(expense.date)}', 
-                              style: TextStyle(color: Colors.grey[600], fontSize: 13)
-                            ),
-                            trailing: Text('\$${expense.amount.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AddExpenseScreen(expenseToEdit: expense))),
+                                '${category.name} • ${DateFormat.jm().format(expense.date)}',
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 13)),
+                            trailing: Text(
+                                '\$${expense.amount.toStringAsFixed(2)}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16)),
+                            onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                    builder: (_) => AddExpenseScreen(
+                                        expenseToEdit: expense))),
                           ),
                         );
                       }
@@ -310,34 +443,73 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     childCount: groupedItems.length,
                   ),
                 ),
-                
+
               // Extra Bottom padding for the fixed footer
               const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
           );
         },
-
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, stack) => Center(child: Text('Error: $err')),
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
-          child: SizedBox(
-             height: 56,
-             child: FilledButton.icon(
-               onPressed: () {
-                 Navigator.of(context).push(
-                   MaterialPageRoute(builder: (_) => const AddExpenseScreen()),
-                 );
-               },
-               style: FilledButton.styleFrom(
-                 backgroundColor: Colors.black, // Premium look
-                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-               ),
-               icon: const Icon(Icons.add, color: Colors.white),
-               label: const Text("Add Expense", style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
-             ),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: _isScanning || ocrApiUrlAsync.isLoading
+                        ? null
+                        : _scanReceipt,
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: _isScanning
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.document_scanner),
+                    label: Text(_isScanning ? 'Scanning...' : 'Scan Receipt'),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 56,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                            builder: (_) => const AddExpenseScreen()),
+                      );
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.add, color: Colors.white),
+                    label: const Text(
+                      "Add Expense",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -350,7 +522,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     // Group by category
     final Map<int, double> totals = {};
     final Map<int, Category> categoryMap = {};
-    
+
     for (var item in expenses) {
       final id = item.category.id;
       totals[id] = (totals[id] ?? 0) + item.expense.amount;
@@ -376,7 +548,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               label: const Text('All'),
               selected: isSelected,
               onSelected: (selected) {
-                 if (selected) setState(() => _selectedCategoryId = null);
+                if (selected) setState(() => _selectedCategoryId = null);
               },
             );
           }
@@ -399,26 +571,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: isSelected ? Color(category.color).withOpacity(0.2) : Colors.white,
+                color: isSelected
+                    ? Color(category.color).withOpacity(0.2)
+                    : Colors.white,
                 border: Border.all(
-                  color: isSelected ? Color(category.color) : Colors.grey[300]!,
-                  width: isSelected ? 2 : 1
-                ),
+                    color:
+                        isSelected ? Color(category.color) : Colors.grey[300]!,
+                    width: isSelected ? 2 : 1),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
                 children: [
                   Container(
-                    width: 10, height: 10,
-                    decoration: BoxDecoration(color: Color(category.color), shape: BoxShape.circle),
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                        color: Color(category.color), shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 8),
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(category.name, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey[800])),
-                      Text('\$${amount.toStringAsFixed(0)}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                      Text(category.name,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey[800])),
+                      Text('\$${amount.toStringAsFixed(0)}',
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.grey)),
                     ],
                   ),
                 ],
@@ -430,8 +612,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-
-
   List<ListItem> _groupExpenses(List<ExpenseWithCategory> items) {
     if (items.isEmpty) return [];
     final List<ListItem> grouped = [];
@@ -439,10 +619,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     for (var item in items) {
       final date = item.expense.date;
-      final isSameDay = lastDate != null && 
-        lastDate.year == date.year && 
-        lastDate.month == date.month && 
-        lastDate.day == date.day;
+      final isSameDay = lastDate != null &&
+          lastDate.year == date.year &&
+          lastDate.month == date.month &&
+          lastDate.day == date.day;
 
       if (!isSameDay) {
         grouped.add(DateHeader(_formatDate(date)));
@@ -466,10 +646,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 }
 
 abstract class ListItem {}
+
 class DateHeader extends ListItem {
   final String text;
   DateHeader(this.text);
 }
+
 class ExpenseItem extends ListItem {
   final ExpenseWithCategory data;
   ExpenseItem(this.data);
