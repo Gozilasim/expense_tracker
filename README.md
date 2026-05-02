@@ -6,9 +6,16 @@ It is built for quick everyday use: add an expense, choose a category, review yo
 
 ## 🎬 Demo
 
-Upload your demo video to GitHub, then paste the video link here.
 
-<!-- Add your GitHub uploaded demo video link here -->
+
+
+https://github.com/user-attachments/assets/d31e2cd2-1dfa-4163-a7e7-09eb7e1f337d
+
+
+
+
+
+
 
 ## ✨ What You Can Do
 
