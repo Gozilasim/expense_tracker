@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/providers.dart';
 import '../data/local/database.dart'; // Need Category type
+import '../l10n/app_l10n.dart';
 
 class CategorySummaryBar extends StatelessWidget {
   final List<ExpenseWithCategory> allExpenses;
@@ -9,12 +10,14 @@ class CategorySummaryBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     // 1. Filter for current month
     final now = DateTime.now();
-    final thisMonthExpenses = allExpenses.where((e) => 
-      e.expense.date.year == now.year && 
-      e.expense.date.month == now.month
-    ).toList();
+    final thisMonthExpenses = allExpenses
+        .where((e) =>
+            e.expense.date.year == now.year &&
+            e.expense.date.month == now.month)
+        .toList();
 
     if (thisMonthExpenses.isEmpty) return const SizedBox.shrink();
 
@@ -32,7 +35,7 @@ class CategorySummaryBar extends StatelessWidget {
     final summaryList = totals.entries.map((e) {
       return (category: categoryMap[e.key]!, total: e.value);
     }).toList();
-    
+
     // Sort by highest amount
     summaryList.sort((a, b) => b.total.compareTo(a.total));
 
@@ -46,7 +49,8 @@ class CategorySummaryBar extends StatelessWidget {
           final item = summaryList[index];
           return Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             margin: const EdgeInsets.only(right: 12),
             child: Container(
               width: 120,
@@ -55,34 +59,40 @@ class CategorySummaryBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                   Row(
-                     children: [
-                       Container(
-                         width: 10, height: 10,
-                         decoration: BoxDecoration(
-                           color: Color(item.category.color),
-                           shape: BoxShape.circle,
-                         ),
-                       ),
-                       const SizedBox(width: 8),
-                       Expanded(
-                         child: Text(
-                           item.category.name,
-                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                           overflow: TextOverflow.ellipsis,
-                         ),
-                       ),
-                     ],
-                   ),
-                   const Spacer(),
-                   Text(
-                     '\$${item.total.toStringAsFixed(0)}',
-                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                   ),
-                   const Text(
-                     'This Month',
-                     style: TextStyle(fontSize: 10, color: Colors.grey),
-                   )
+                  Row(
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Color(item.category.color),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.category.name,
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    '\$${item.total.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    context.l10n.thisMonth,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  )
                 ],
               ),
             ),

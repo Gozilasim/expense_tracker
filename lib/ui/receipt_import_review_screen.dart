@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../data/local/database.dart';
 import '../data/receipt_ocr.dart';
+import '../l10n/app_l10n.dart';
 
 class ReceiptImportReviewScreen extends ConsumerStatefulWidget {
   const ReceiptImportReviewScreen({
@@ -71,25 +72,25 @@ class _ReceiptImportReviewScreenState
 
     final includedDrafts = _drafts.where((draft) => draft.isIncluded).toList();
     if (includedDrafts.isEmpty) {
-      _showSnackBar('Select at least one entry to import.');
+      _showSnackBar(context.l10n.selectAtLeastOneEntry);
       return;
     }
 
     final reviewedEntries = <ReviewedReceiptEntry>[];
 
     for (final draft in includedDrafts) {
-      final entryLabel = 'Entry ${_drafts.indexOf(draft) + 1}';
+      final entryLabel = context.l10n.entryLabel(_drafts.indexOf(draft) + 1);
 
       final amount = double.tryParse(draft.amountText.trim());
       if (amount == null || amount <= 0) {
-        _showSnackBar('$entryLabel must have a valid amount.');
+        _showSnackBar(context.l10n.entryValidAmount(entryLabel));
         return;
       }
 
       if (draft.useNewCategory) {
         final name = draft.newCategoryName.trim();
         if (name.isEmpty) {
-          _showSnackBar('$entryLabel must have a new category name.');
+          _showSnackBar(context.l10n.entryNewCategoryName(entryLabel));
           return;
         }
 
@@ -106,7 +107,7 @@ class _ReceiptImportReviewScreenState
       }
 
       if (draft.selectedCategoryId == null) {
-        _showSnackBar('$entryLabel must have a category selected.');
+        _showSnackBar(context.l10n.entryCategorySelected(entryLabel));
         return;
       }
 
@@ -151,17 +152,20 @@ class _ReceiptImportReviewScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Review OCR Entries'),
+        title: Text(l10n.reviewOcrEntries),
       ),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Review the extracted entries before saving them to your records.',
-              style: TextStyle(color: Colors.grey[700]),
+              l10n.reviewOcrDescription,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
             ),
           ),
           Expanded(
@@ -218,7 +222,7 @@ class _ReceiptImportReviewScreenState
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.save),
-              label: Text(_isSaving ? 'Saving...' : 'Save Selected Entries'),
+              label: Text(_isSaving ? l10n.saving : l10n.saveSelectedEntries),
             ),
           ),
         ),
@@ -255,6 +259,8 @@ class _ReceiptEntryCard extends StatelessWidget {
     final categoryDropdownValue = draft.useNewCategory
         ? _newCategoryDropdownValue
         : draft.selectedCategoryId?.toString();
+    final l10n = context.l10n;
+    final localeName = Localizations.localeOf(context).toLanguageTag();
 
     return Card(
       child: Padding(
@@ -266,7 +272,7 @@ class _ReceiptEntryCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Entry ${index + 1}',
+                    l10n.entryLabel(index + 1),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -287,10 +293,10 @@ class _ReceiptEntryCard extends StatelessWidget {
               onChanged: onAmountChanged,
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount',
+              decoration: InputDecoration(
+                labelText: l10n.amount,
                 prefixText: '\$ ',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -298,15 +304,16 @@ class _ReceiptEntryCard extends StatelessWidget {
               key: Key('review-entry-date-$index'),
               onTap: onDateTap,
               child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Date',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.date,
+                  border: const OutlineInputBorder(),
                 ),
                 child: Row(
                   children: [
                     const Icon(Icons.calendar_today, size: 18),
                     const SizedBox(width: 8),
-                    Text(DateFormat('yyyy-MM-dd').format(draft.date)),
+                    Text(DateFormat('yyyy-MM-dd', localeName)
+                        .format(draft.date)),
                   ],
                 ),
               ),
@@ -315,9 +322,9 @@ class _ReceiptEntryCard extends StatelessWidget {
             DropdownButtonFormField<String>(
               key: Key('review-entry-category-$index'),
               value: categoryDropdownValue,
-              decoration: const InputDecoration(
-                labelText: 'Category',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.category,
+                border: const OutlineInputBorder(),
               ),
               items: [
                 ...categories.map(
@@ -326,9 +333,9 @@ class _ReceiptEntryCard extends StatelessWidget {
                     child: Text(category.name),
                   ),
                 ),
-                const DropdownMenuItem<String>(
+                DropdownMenuItem<String>(
                   value: _newCategoryDropdownValue,
-                  child: Text('Create new...'),
+                  child: Text(l10n.createNew),
                 ),
               ],
               onChanged: onCategoryChanged,
@@ -339,9 +346,9 @@ class _ReceiptEntryCard extends StatelessWidget {
                 key: Key('review-entry-new-category-$index'),
                 initialValue: draft.newCategoryName,
                 onChanged: onNewCategoryNameChanged,
-                decoration: const InputDecoration(
-                  labelText: 'New Category Name',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.newCategoryName,
+                  border: const OutlineInputBorder(),
                 ),
               ),
             ],
@@ -351,9 +358,9 @@ class _ReceiptEntryCard extends StatelessWidget {
               initialValue: draft.note,
               onChanged: onNoteChanged,
               maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Note',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.note,
+                border: const OutlineInputBorder(),
               ),
             ),
           ],

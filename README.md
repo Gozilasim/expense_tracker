@@ -1,111 +1,56 @@
-# Expense Tracker
+# My Expense 💸
 
-A local expense tracking app built with Flutter. Data is stored in SQLite, state is managed with Riverpod, and charts are rendered with `fl_chart`.
+My Expense is a simple personal expense tracker for recording daily spending, scanning receipts, and understanding where your money goes.
 
-## Features
+It is built for quick everyday use: add an expense, choose a category, review your monthly spending, and keep your data with you.
 
-- Add, edit, and delete expense records
-- Filter data by month, year, or a custom date range
-- View category totals and spending distribution
-- Manage categories: add, edit, and delete
-- Backup and restore local data
-- Fully local persistence with no remote backend
+## 🎬 Demo
 
-## Tech Stack
+Upload your demo video to GitHub, then paste the video link here.
 
-- Flutter
-- Riverpod
-- Drift + SQLite
-- fl_chart
-- intl
-- share_plus
-- file_picker
+<!-- Add your GitHub uploaded demo video link here -->
 
-## Project Structure
+## ✨ What You Can Do
 
-```text
-expense_tracker/
-|- lib/
-|  |- data/          Data layer: database, providers, query logic
-|  |- ui/            Screens and UI components
-|  |- main.dart      Application entry point
-|- test/             Test directory
-|- android/ios/...   Flutter platform projects
-|- pubspec.yaml      Dependencies and project configuration
-```
+- 🧾 Add, edit, and delete expenses
+- 📷 Scan receipts with an OCR backend
+- 📅 View spending by month, year, or custom date range
+- 📊 See category totals and spending distribution
+- 🏷️ Create and manage your own categories
+- 💾 Backup and restore your expense data
+- 🌐 Switch between supported languages
+- 🌓 Use light, dark, or system theme mode
 
-See the following for more details:
+## 💡 Why I Built This
 
-- [lib/README.md](lib/README.md)
-- [lib/data/README.md](lib/data/README.md)
-- [lib/ui/README.md](lib/ui/README.md)
-- [test/README.md](test/README.md)
+I started building My Expense from a very personal problem.
 
-## Current Data Model
+About four months ago, I began a bulking journey and started tracking my daily meals and nutrition more seriously. Since I was cooking all three meals myself, I paid closer attention to what I was eating, how much protein I was getting, and how much I was spending on food.
 
-### `categories`
+After a few days, I realized something unexpected: some of my nutrition intake, especially protein, was already more than enough. That made me think about cost. If I could understand my daily food expenses better, I could adjust my meals, reduce waste, and cut unnecessary spending without hurting my nutrition goals.
 
-- `id`: auto-increment primary key
-- `name`: category name
-- `icon`: Material Icon code point stored as a string, nullable
-- `color`: category color value
+At first, this app was just a simple manual expense tracker. I used it for more than a month, but eventually I stopped because entering every expense by hand became too annoying.
 
-### `expenses`
+Later, I had the idea to add OCR receipt scanning. Instead of typing everything manually, I could just scan a receipt and let the app help turn it into expense records. That made the app feel much closer to something I would actually keep using every day.
 
-- `id`: auto-increment primary key
-- `amount`: expense amount
-- `date`: expense timestamp
-- `note`: optional note
-- `categoryId`: related category id
+## 🔒 Privacy
 
-When the database is created for the first time, a default `General` category is inserted automatically.
+Your expense records are stored locally on your device.
 
-## Local Development
+Data only leaves your device when you choose to export a backup, share a database file, or connect to an OCR backend for receipt scanning.
 
-### 1. Install dependencies
+## 📦 Download
 
-```bash
-flutter pub get
-```
+APK release:
 
-### 2. Generate code
+https://github.com/Gozilasim/expense_tracker/releases/download/v1.0.0/my-expense-v1.0.0-release.apk
 
-This project uses code generation for Drift and Riverpod:
+## 👤 Owner
 
-```bash
-dart run build_runner build --delete-conflicting-outputs
-```
+Created by [Gozilasim](https://github.com/Gozilasim).
 
-If you want continuous generation during development:
+If you feel satisfied, please treat the developer a coffee. ☕
 
-```bash
-dart run build_runner watch --delete-conflicting-outputs
-```
+## 🛠️ Built With
 
-### 3. Run the app
-
-```bash
-flutter run
-```
-
-## Key Entry Points
-
-- App entry point: [lib/main.dart](lib/main.dart)
-- Home screen and filter logic: [lib/ui/home_screen.dart](lib/ui/home_screen.dart)
-- Add/edit expense flow: [lib/ui/add_expense_screen.dart](lib/ui/add_expense_screen.dart)
-- Category management and backup/restore: [lib/ui/category_manager_screen.dart](lib/ui/category_manager_screen.dart)
-- Database definition: [lib/data/local/database.dart](lib/data/local/database.dart)
-- Providers and queries: [lib/data/providers.dart](lib/data/providers.dart)
-
-## Important Notes
-
-- The database file is a local `db.sqlite` stored in the app documents directory, not the repository root.
-- `lib/data/providers.g.dart` and `lib/data/local/database.g.dart` are generated files and should not be edited manually.
-- `test/widget_test.dart` is still the default Flutter template test and does not match the current app behavior.
-- The repository root contains development artifacts such as `build/`, `.dart_tool/`, `db.sqlite`, and `build_log*.txt`; keep them separate from source files when maintaining the project.
-
-## Suggested Next Improvements
-
-- Improve database reload behavior after import/restore so the app does not rely on a restart recommendation
-- Define a clearer strategy for deleting categories that are referenced by expenses
-- Add tests for filtering, CRUD flows, and backup/restore behavior
+My Expense is built with Flutter and stores data locally with SQLite. Receipt scanning can connect to an OCR backend when configured by the user.

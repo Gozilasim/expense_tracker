@@ -1,0 +1,212 @@
+{
+  "@@locale": "en",
+  "appTitle": "My Expense",
+  "settings": "Settings",
+  "language": "Language",
+  "languageSubtitle": "Choose app display language.",
+  "theme": "Theme",
+  "themeSystemMode": "System mode",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "systemDefault": "Follow system",
+  "systemDefaultSubtitle": "Use your device language when supported.",
+  "chineseLanguage": "华文",
+  "malayLanguage": "Bahasa Melayu",
+  "englishLanguage": "English",
+  "theme": "Theme",
+  "themeSystemMode": "System mode",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "linkBackend": "Link Backend",
+  "linkBackendSubtitle": "Connect the OCR receipt scanning API.",
+  "categories": "Categories",
+  "categoriesSubtitle": "Create, edit, and delete expense categories.",
+  "data": "Data",
+  "dataSubtitle": "Backup or restore your local expense database.",
+  "about": "About",
+  "aboutSubtitle": "Owner, GitHub profile, and DuitNow QR.",
+  "deleteExpenseTitle": "Delete Expense?",
+  "deleteExpenseMessage": "Are you sure you want to delete this expense?",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "retry": "Retry",
+  "month": "Month",
+  "year": "Year",
+  "custom": "Custom",
+  "totalAmount": "Total: ${amount}",
+  "@totalAmount": {
+    "placeholders": {
+      "amount": {}
+    }
+  },
+  "today": "Today",
+  "yesterday": "Yesterday",
+  "all": "All",
+  "noExpensesFound": "No expenses found.",
+  "scanReceipt": "Scan Receipt",
+  "scanning": "Scanning...",
+  "addExpense": "Add Expense",
+  "takePhoto": "Take Photo",
+  "chooseFromGallery": "Choose From Gallery",
+  "loadingOcrApiUrl": "Loading saved OCR API URL. Try again in a moment.",
+  "setOcrApiUrlFirst": "Set your OCR Backend API URL first.",
+  "setOcrApiUrlBanner": "Set OCR API URL before scanning receipts.",
+  "set": "Set",
+  "errorMessage": "Error: {error}",
+  "@errorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "newExpense": "New Expense",
+  "editExpense": "Edit Expense",
+  "pleaseSelectCategory": "Please select a category",
+  "amount": "Amount",
+  "category": "Category",
+  "noCategoriesSeed": "No categories found. Restart app to seed.",
+  "noteOptional": "Note (Optional)",
+  "updateExpense": "Update Expense",
+  "saveExpense": "Save Expense",
+  "categoriesSection": "CATEGORIES",
+  "noCategoriesAvailable": "No categories available.",
+  "deleteCategoryTitle": "Delete Category?",
+  "deleteCategoryMessage": "Delete \"{name}\"? Related expenses might be affected.",
+  "@deleteCategoryMessage": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "editCategory": "Edit Category",
+  "newCategory": "New Category",
+  "name": "Name",
+  "pickColor": "Pick a Color:",
+  "pickIcon": "Pick an Icon:",
+  "colorAlreadyTaken": "Color already taken! Please pick another.",
+  "save": "Save",
+  "add": "Add",
+  "noDataForPeriod": "No data for this period",
+  "dailyAverage": "Daily Average",
+  "totalSpending": "Total Spending",
+  "thisMonth": "This Month",
+  "receiptOcrBackend": "Receipt OCR Backend",
+  "backendDescription": "Connect the backend endpoint used when scanning receipts.",
+  "ocrBackendApiUrl": "OCR Backend API URL",
+  "backendUrlHelp": "Save the full backend API URL used for OCR receipt imports.",
+  "invalidApiUrl": "Enter a valid full http/https API URL.",
+  "apiUrlCleared": "OCR Backend API URL cleared.",
+  "apiUrlSaved": "OCR Backend API URL saved.",
+  "failedToSaveApiUrl": "Failed to save API URL: {error}",
+  "@failedToSaveApiUrl": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "failedToLoadApiUrl": "Failed to load saved API URL: {error}",
+  "@failedToLoadApiUrl": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "saveApiUrl": "Save API URL",
+  "saving": "Saving...",
+  "testConnection": "Test Connection",
+  "testing": "Testing...",
+  "backupRestore": "Backup and Restore",
+  "backupRestoreDescription": "Export your local database or restore from a previous backup.",
+  "backupData": "Backup Data",
+  "backupDataSubtitle": "Export db.sqlite and share it as a backup file.",
+  "restoreData": "Restore Data",
+  "restoreDataSubtitle": "Import a backup file and replace local expense data.",
+  "noDatabaseBackup": "No database found to backup!",
+  "backupShareText": "My Expense backup (db.sqlite)",
+  "backupReady": "Backup ready to share.",
+  "backupFailed": "Backup failed: {error}",
+  "@backupFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "restoreBackupTitle": "Restore Backup?",
+  "restoreBackupMessage": "This will overwrite all current expense data with the selected backup. This action cannot be undone.\n\nDo you want to continue?",
+  "restore": "Restore",
+  "restoreSuccess": "Restored successfully! Restarting app is recommended.",
+  "restoreFailed": "Restore failed: {error}",
+  "@restoreFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "owner": "Owner",
+  "ownerCoffeeMessage": "If you feel satisfied, please treat the developer a coffee.",
+  "unableToOpenGithub": "Unable to open GitHub link.",
+  "close": "Close",
+  "tapToEnlarge": "Tap to enlarge",
+  "reviewOcrEntries": "Review OCR Entries",
+  "reviewOcrDescription": "Review the extracted entries before saving them to your records.",
+  "selectAtLeastOneEntry": "Select at least one entry to import.",
+  "entryLabel": "Entry {number}",
+  "@entryLabel": {
+    "placeholders": {
+      "number": {}
+    }
+  },
+  "entryValidAmount": "{entry} must have a valid amount.",
+  "@entryValidAmount": {
+    "placeholders": {
+      "entry": {}
+    }
+  },
+  "entryNewCategoryName": "{entry} must have a new category name.",
+  "@entryNewCategoryName": {
+    "placeholders": {
+      "entry": {}
+    }
+  },
+  "entryCategorySelected": "{entry} must have a category selected.",
+  "@entryCategorySelected": {
+    "placeholders": {
+      "entry": {}
+    }
+  },
+  "saveSelectedEntries": "Save Selected Entries",
+  "date": "Date",
+  "createNew": "Create new...",
+  "newCategoryName": "New Category Name",
+  "note": "Note",
+  "serverPathNotFound": "Server reached, but this OCR API path was not found.",
+  "serverReturnedStatus": "Server reached, but it returned {statusCode}.",
+  "@serverReturnedStatus": {
+    "placeholders": {
+      "statusCode": {}
+    }
+  },
+  "ocrServerReachable": "OCR server is reachable.",
+  "connectionTimedOut": "Connection timed out. Check the API URL and network.",
+  "connectionTestFailed": "Connection test failed: {error}",
+  "@connectionTestFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "ocrRequestTimedOut": "OCR request timed out. Check that the backend is running and reachable from this phone.",
+  "cannotResolveOcrHost": "Cannot resolve the OCR API host. Check the URL domain or IP address.",
+  "ocrConnectionRefused": "OCR backend refused the connection. Check that the server is running on this port.",
+  "ocrBackendUnreachable": "OCR backend is unreachable. Check that the phone and server are on the same network.",
+  "cannotConnectOcrBackend": "Cannot connect to the OCR backend. Check the API URL, Wi-Fi, and server firewall.",
+  "httpTrafficBlocked": "HTTP traffic was blocked. Use HTTPS or allow cleartext traffic for local testing.",
+  "cannotConnectOcrNetwork": "Cannot connect to the OCR backend. Check the API URL and network.",
+  "ocrScanFailed": "OCR scan failed. Please try again.",
+  "recognitionServiceUnavailable": "Recognition service is temporarily unavailable. Please try again later.",
+  "ocrRequestInvalid": "OCR request is invalid. Please try again later.",
+  "recognitionFailed": "Recognition failed. Please try again later.",
+  "uploadClearReceipt": "Please upload a clear receipt photo.",
+  "receiptItemsUnreadable": "The receipt line items are not readable. Please take a clearer photo.",
+  "categoryDataInvalid": "Category data is invalid. Please try again later.",
+  "unsupportedImageType": "Only JPEG, PNG, and WebP images are supported.",
+  "emptyImageFile": "The selected image file is empty. Please choose another image.",
+  "imageTooLarge": "Image must be 3 MB or smaller.",
+  "cameraPermissionBlocked": "Camera permission is blocked. Open app settings to allow receipt scanning.",
+  "cameraPermissionRequired": "Camera permission is required to take receipt photos.",
+  "photoPermissionBlocked": "Photo permission is blocked. Open app settings to allow receipt imports.",
+  "photoPermissionRequired": "Photo permission is required to choose receipt images."
+}
