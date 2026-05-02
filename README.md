@@ -28,6 +28,17 @@ https://github.com/user-attachments/assets/d31e2cd2-1dfa-4163-a7e7-09eb7e1f337d
 - 🌐 Switch between supported languages
 - 🌓 Use light, dark, or system theme mode
 
+## 🔗 OCR Backend Access
+
+Receipt scanning requires an OCR backend URL.
+
+The public app does not include a default OCR backend. If you need access to the OCR backend URL, please star this repository and contact me on Telegram:
+
+```text
+Telegram: [@Gozilasim](https://t.me/Gozilasim)
+
+```
+
 ## 💡 Why I Built This
 
 I started building My Expense from a very personal problem.
