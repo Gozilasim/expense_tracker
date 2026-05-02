@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
 
 import 'local/database.dart';
 import 'providers.dart';
@@ -19,6 +23,45 @@ class ReceiptImportException implements Exception {
 }
 
 enum ReceiptCategoryKind { existing, newCategory }
+
+enum ReceiptScanFailureKind {
+  userInput,
+  serviceUnavailable,
+  appBug,
+  serverError,
+  unknown,
+}
+
+class ReceiptScanException implements Exception {
+  ReceiptScanException({
+    required this.kind,
+    required this.userMessage,
+    this.statusCode,
+    this.backendDetail,
+    this.responseBody,
+  });
+
+  final ReceiptScanFailureKind kind;
+  final String userMessage;
+  final int? statusCode;
+  final String? backendDetail;
+  final String? responseBody;
+
+  bool get canRetry => kind == ReceiptScanFailureKind.serviceUnavailable;
+
+  @override
+  String toString() => userMessage;
+}
+
+class OcrConnectionTestResult {
+  const OcrConnectionTestResult({
+    required this.reachable,
+    required this.message,
+  });
+
+  final bool reachable;
+  final String message;
+}
 
 class ReceiptOcrEntry {
   ReceiptOcrEntry({
@@ -125,8 +168,9 @@ List<ReceiptOcrEntry> parseReceiptEntries({
     final categoryKind = _parseCategoryKind(rawEntry['category_kind']);
     final categoryId = _parseOptionalInt(rawEntry['category_id']);
     final categoryName = _parseOptionalText(rawEntry['category_name']) ?? '';
+    final isExistingCategory = categoryKind == ReceiptCategoryKind.existing;
 
-    if (categoryKind == ReceiptCategoryKind.existing) {
+    if (isExistingCategory) {
       if (categoryId == null || !categoriesById.containsKey(categoryId)) {
         throw ReceiptImportException(
           'Existing category entries must reference a valid local category_id.',
@@ -143,13 +187,67 @@ List<ReceiptOcrEntry> parseReceiptEntries({
       date: date,
       note: note,
       categoryKind: categoryKind,
-      categoryId: categoryId,
+      categoryId: isExistingCategory ? categoryId : null,
       categoryName: categoryName.trim(),
     );
   }).toList();
 }
 
 class ReceiptOcrApiClient {
+  static const _requestTimeout = Duration(seconds: 35);
+  static const _connectionTestTimeout = Duration(seconds: 8);
+
+  Future<OcrConnectionTestResult> testConnection({
+    required Uri apiUrl,
+    http.Client? client,
+  }) async {
+    final httpClient = client ?? http.Client();
+
+    try {
+      final response = await httpClient.get(apiUrl).timeout(_connectionTestTimeout);
+      if (response.statusCode == 404) {
+        return const OcrConnectionTestResult(
+          reachable: false,
+          message: 'Server reached, but this OCR API path was not found.',
+        );
+      }
+      if (response.statusCode >= 500) {
+        return OcrConnectionTestResult(
+          reachable: false,
+          message: 'Server reached, but it returned ${response.statusCode}.',
+        );
+      }
+      return const OcrConnectionTestResult(
+        reachable: true,
+        message: 'OCR server is reachable.',
+      );
+    } on TimeoutException {
+      return const OcrConnectionTestResult(
+        reachable: false,
+        message: 'Connection timed out. Check the API URL and network.',
+      );
+    } on SocketException catch (error) {
+      return OcrConnectionTestResult(
+        reachable: false,
+        message: _socketErrorMessage(error),
+      );
+    } on http.ClientException catch (error) {
+      return OcrConnectionTestResult(
+        reachable: false,
+        message: _clientErrorMessage(error),
+      );
+    } catch (error) {
+      return OcrConnectionTestResult(
+        reachable: false,
+        message: 'Connection test failed: $error',
+      );
+    } finally {
+      if (client == null) {
+        httpClient.close();
+      }
+    }
+  }
+
   Future<List<ReceiptOcrEntry>> scanReceipt({
     required Uri apiUrl,
     required XFile imageFile,
@@ -173,21 +271,40 @@ class ReceiptOcrApiClient {
             'image',
             await imageFile.readAsBytes(),
             filename: imageFile.name,
+            contentType: _imageContentType(imageFile),
           ),
         );
 
-      final streamedResponse = await httpClient.send(request);
-      final response = await http.Response.fromStream(streamedResponse);
+      final streamedResponse =
+          await httpClient.send(request).timeout(_requestTimeout);
+      final response = await http.Response.fromStream(streamedResponse)
+          .timeout(_requestTimeout);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw ReceiptImportException(
-          'Backend request failed (${response.statusCode}): ${response.body}',
-        );
+        throw _scanExceptionForResponse(response);
       }
 
       return parseReceiptEntries(
         responseBody: response.body,
         categories: categories,
+      );
+    } on TimeoutException {
+      throw ReceiptScanException(
+        kind: ReceiptScanFailureKind.serviceUnavailable,
+        userMessage:
+            'OCR request timed out. Check that the backend is running and reachable from this phone.',
+      );
+    } on SocketException catch (error) {
+      throw ReceiptScanException(
+        kind: ReceiptScanFailureKind.serviceUnavailable,
+        backendDetail: error.message,
+        userMessage: _socketErrorMessage(error),
+      );
+    } on http.ClientException catch (error) {
+      throw ReceiptScanException(
+        kind: ReceiptScanFailureKind.serviceUnavailable,
+        backendDetail: error.message,
+        userMessage: _clientErrorMessage(error),
       );
     } finally {
       if (client == null) {
@@ -432,11 +549,12 @@ ReceiptCategoryKind _parseCategoryKind(Object? value) {
   switch (value.trim()) {
     case 'existing':
       return ReceiptCategoryKind.existing;
+    case 'generated':
     case 'new':
       return ReceiptCategoryKind.newCategory;
     default:
       throw ReceiptImportException(
-        'category_kind must be either "existing" or "new".',
+        'category_kind must be either "existing", "generated", or "new".',
       );
   }
 }
@@ -451,9 +569,150 @@ int? _parseOptionalInt(Object? value) {
 
 String _normalizeCategoryName(String input) => input.trim().toLowerCase();
 
+String _socketErrorMessage(SocketException error) {
+  final message = error.message.toLowerCase();
+  if (message.contains('failed host lookup') ||
+      message.contains('nodename') ||
+      message.contains('name or service')) {
+    return 'Cannot resolve the OCR API host. Check the URL domain or IP address.';
+  }
+  if (message.contains('connection refused')) {
+    return 'OCR backend refused the connection. Check that the server is running on this port.';
+  }
+  if (message.contains('network is unreachable') ||
+      message.contains('no route to host')) {
+    return 'OCR backend is unreachable. Check that the phone and server are on the same network.';
+  }
+  return 'Cannot connect to the OCR backend. Check the API URL, Wi-Fi, and server firewall.';
+}
+
+String _clientErrorMessage(http.ClientException error) {
+  final message = error.message.toLowerCase();
+  if (message.contains('cleartext') || message.contains('http')) {
+    return 'HTTP traffic was blocked. Use HTTPS or allow cleartext traffic for local testing.';
+  }
+  return 'Cannot connect to the OCR backend. Check the API URL and network.';
+}
+ReceiptScanException _scanExceptionForResponse(http.Response response) {
+  final parsedDetail = _parseBackendErrorDetail(response.body);
+
+  if (parsedDetail == null) {
+    return ReceiptScanException(
+      kind: ReceiptScanFailureKind.unknown,
+      statusCode: response.statusCode,
+      responseBody: response.body,
+      userMessage: 'OCR scan failed. Please try again.',
+    );
+  }
+
+  switch (response.statusCode) {
+    case 400:
+      return ReceiptScanException(
+        kind: ReceiptScanFailureKind.userInput,
+        statusCode: response.statusCode,
+        backendDetail: parsedDetail,
+        responseBody: response.body,
+        userMessage: _userInputMessageForDetail(parsedDetail),
+      );
+    case 502:
+      return ReceiptScanException(
+        kind: ReceiptScanFailureKind.serviceUnavailable,
+        statusCode: response.statusCode,
+        backendDetail: parsedDetail,
+        responseBody: response.body,
+        userMessage:
+            'Recognition service is temporarily unavailable. Please try again later.',
+      );
+    case 422:
+      return ReceiptScanException(
+        kind: ReceiptScanFailureKind.appBug,
+        statusCode: response.statusCode,
+        backendDetail: parsedDetail,
+        responseBody: response.body,
+        userMessage: 'OCR request is invalid. Please try again later.',
+      );
+    case 500:
+      return ReceiptScanException(
+        kind: ReceiptScanFailureKind.serverError,
+        statusCode: response.statusCode,
+        backendDetail: parsedDetail,
+        responseBody: response.body,
+        userMessage: 'Recognition failed. Please try again later.',
+      );
+    default:
+      return ReceiptScanException(
+        kind: ReceiptScanFailureKind.unknown,
+        statusCode: response.statusCode,
+        backendDetail: parsedDetail,
+        responseBody: response.body,
+        userMessage: 'OCR scan failed. Please try again.',
+      );
+  }
+}
+
+String? _parseBackendErrorDetail(String body) {
+  try {
+    final decoded = jsonDecode(body);
+    if (decoded is! Map<String, dynamic>) return null;
+
+    final detail = decoded['detail'];
+    if (detail is! String || detail.trim().isEmpty) return null;
+
+    return detail.trim();
+  } catch (_) {
+    return null;
+  }
+}
+
+String _userInputMessageForDetail(String detail) {
+  switch (detail) {
+    case 'Image is not a receipt':
+      return 'Please upload a clear receipt photo.';
+    case 'Receipt does not contain readable line items':
+      return 'The receipt line items are not readable. Please take a clearer photo.';
+    case 'categories_json must be a valid JSON array':
+    case 'categories_json must be a JSON array':
+    case 'categories_json must contain category objects with id and name':
+      return 'Category data is invalid. Please try again later.';
+    case 'Only JPEG, PNG, and WebP images are supported':
+      return 'Only JPEG, PNG, and WebP images are supported.';
+    case 'Uploaded file is empty':
+      return 'The selected image file is empty. Please choose another image.';
+    case 'Image must be 3 MB or smaller':
+      return 'Image must be 3 MB or smaller.';
+    default:
+      return 'Please upload a clear receipt photo.';
+  }
+}
+
+MediaType? _imageContentType(XFile imageFile) {
+  final mimeType = imageFile.mimeType?.toLowerCase();
+  if (mimeType != null) {
+    final parts = mimeType.split('/');
+    if (parts.length == 2) {
+      return MediaType(parts[0], parts[1]);
+    }
+  }
+
+  switch (p.extension(imageFile.name).toLowerCase()) {
+    case '.jpg':
+    case '.jpeg':
+      return MediaType('image', 'jpeg');
+    case '.png':
+      return MediaType('image', 'png');
+    case '.webp':
+      return MediaType('image', 'webp');
+    default:
+      return null;
+  }
+}
+
 final List<int> _defaultCategoryColors = [
   ...Colors.primaries.map((color) => color.value),
   Colors.grey.value,
   Colors.blueGrey.value,
   Colors.black.value,
 ];
+
+
+

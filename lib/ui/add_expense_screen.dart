@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
 import '../data/providers.dart';
 import '../data/local/database.dart';
+import '../l10n/app_l10n.dart';
 
 import 'package:intl/intl.dart';
 
@@ -52,7 +53,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Future<void> _save() async {
     if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a category')),
+        SnackBar(content: Text(context.l10n.pleaseSelectCategory)),
       );
       return;
     }
@@ -92,20 +93,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Future<void> _delete() async {
     if (widget.expenseToEdit == null) return;
+    final l10n = context.l10n;
 
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Expense?'),
-        content: const Text('Are you sure you want to delete this expense?'),
+        title: Text(l10n.deleteExpenseTitle),
+        content: Text(l10n.deleteExpenseMessage),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel')),
+              child: Text(l10n.cancel)),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
               style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Delete')),
+              child: Text(l10n.delete)),
         ],
       ),
     );
@@ -123,10 +125,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final isEditing = widget.expenseToEdit != null;
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Edit Expense' : 'New Expense'),
+        title: Text(isEditing ? l10n.editExpense : l10n.newExpense),
         actions: [
           if (isEditing)
             IconButton(
@@ -142,10 +146,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           children: [
             TextField(
               controller: _amountController,
-              decoration: const InputDecoration(
-                labelText: 'Amount',
+              decoration: InputDecoration(
+                labelText: l10n.amount,
                 prefixText: '\$ ',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               keyboardType:
                   const TextInputType.numberWithOptions(decimal: true),
@@ -159,20 +163,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey),
+                  border: Border.all(color: colorScheme.outline),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today,
-                        size: 20, color: Colors.grey),
+                    Icon(
+                      Icons.calendar_today,
+                      size: 20,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       DateFormat('yyyy-MM-dd').format(_selectedDate),
                       style: const TextStyle(fontSize: 16),
                     ),
                     const Spacer(),
-                    const Icon(Icons.arrow_drop_down, color: Colors.grey),
+                    Icon(
+                      Icons.arrow_drop_down,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ],
                 ),
               ),
@@ -183,8 +193,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             categoriesAsync.when(
               data: (categories) {
                 if (categories.isEmpty) {
-                  return const Text(
-                      'No categories found. Restart app to seed.');
+                  return Text(l10n.noCategoriesSeed);
                 }
                 // Auto-select first if new and nothing selected
                 if (_selectedCategoryId == null && !isEditing) {
@@ -192,9 +201,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 }
                 return DropdownButtonFormField<int>(
                   value: _selectedCategoryId,
-                  decoration: const InputDecoration(
-                    labelText: 'Category',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: l10n.category,
+                    border: const OutlineInputBorder(),
                   ),
                   items: categories.map((c) {
                     return DropdownMenuItem(
@@ -234,15 +243,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 );
               },
               loading: () => const CircularProgressIndicator(),
-              error: (e, s) => Text('Error: $e'),
+              error: (e, s) => Text(l10n.errorMessage('$e')),
             ),
 
             const SizedBox(height: 16),
             TextField(
               controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: 'Note (Optional)',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.noteOptional,
+                border: const OutlineInputBorder(),
               ),
             ),
             const Spacer(),
@@ -251,7 +260,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               height: 50,
               child: FilledButton(
                 onPressed: _save,
-                child: Text(isEditing ? 'Update Expense' : 'Save Expense'),
+                child: Text(isEditing ? l10n.updateExpense : l10n.saveExpense),
               ),
             ),
             const SizedBox(height: 16), // Bottom padding

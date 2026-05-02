@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../data/providers.dart';
 import '../data/local/database.dart';
+import '../l10n/app_l10n.dart';
 
 class CategoryPieChart extends StatefulWidget {
   final List<ExpenseWithCategory> expenses;
@@ -20,6 +21,8 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     // We remove the empty check return to allow showing "0" or just empty chart with average 0
     // But keeping it for now if expenses is empty, average is 0 anyway.
     // Wait, if expenses is empty, we might still want to show "0"
@@ -31,11 +34,11 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
       // If no expenses, just show 0? Or the "No Data" widget?
       // The user request is about logic.
       // Let's keep "No data" for empty states for now.
-      return const SizedBox(
+      return SizedBox(
           height: 300,
           child: Center(
-              child: Text("No data for this period",
-                  style: TextStyle(color: Colors.grey))));
+              child: Text(context.l10n.noDataForPeriod,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant))));
     }
 
     // 1. Calculations
@@ -57,7 +60,9 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
     final dailyAvg = widget.totalDays > 0 ? grandTotal / widget.totalDays : 0.0;
 
     // 2. Prepare Center Data
-    final displayLabel = showDailyAverage ? "Daily Average" : "Total Spending";
+    final displayLabel = showDailyAverage
+        ? context.l10n.dailyAverage
+        : context.l10n.totalSpending;
     final displayAmount = showDailyAverage ? dailyAvg : grandTotal;
 
     return SizedBox(
@@ -106,21 +111,22 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                           ? Icons.keyboard_arrow_up
                           : Icons.keyboard_arrow_up,
                       size: 24,
-                      color: Colors.grey[400]),
+                      color: colorScheme.onSurfaceVariant),
                   Text(
                     displayLabel,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                        fontWeight: FontWeight.w500),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     '\$${displayAmount.toStringAsFixed(2)}',
-                    style: const TextStyle(
+                    key: const Key('category-pie-center-amount'),
+                    style: TextStyle(
                       fontSize: 30, // Slightly bigger
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   Icon(
@@ -128,7 +134,7 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                           ? Icons.keyboard_arrow_down
                           : Icons.keyboard_arrow_down,
                       size: 24,
-                      color: Colors.grey[400]),
+                      color: colorScheme.onSurfaceVariant),
                 ],
               ),
             ),
@@ -163,14 +169,16 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
   }
 
   Widget _buildBadge(Category category, double amount, String percent) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: colorScheme.shadow.withOpacity(0.16),
             blurRadius: 4,
             offset: const Offset(0, 2),
           )
@@ -186,8 +194,11 @@ class _CategoryPieChartState extends State<CategoryPieChart> {
                   fontSize: 10,
                   fontWeight: FontWeight.bold)),
           Text('\$${amount.toStringAsFixed(0)} ($percent%)',
-              style:
-                  const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              )),
         ],
       ),
     );

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'test_localizations.dart';
+
 void main() {
   const categories = [
     Category(id: 1, name: 'Food', icon: null, color: 0xFF000001),
@@ -16,7 +18,7 @@ void main() {
     required Future<void> Function(List<ReviewedReceiptEntry>) onSaveEntries,
   }) {
     return ProviderScope(
-      child: MaterialApp(
+      child: localizedTestApp(
         home: ReceiptImportReviewScreen(
           entries: entries,
           categories: categories,

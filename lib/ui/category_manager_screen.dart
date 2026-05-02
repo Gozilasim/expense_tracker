@@ -1,14 +1,9 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:drift/drift.dart' as drift;
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-import 'package:share_plus/share_plus.dart';
-import 'package:file_picker/file_picker.dart';
-import '../data/ocr_api_settings.dart';
 import '../data/providers.dart';
 import '../data/local/database.dart';
+import '../l10n/app_l10n.dart';
 
 class CategoryManagerScreen extends ConsumerStatefulWidget {
   const CategoryManagerScreen({super.key});
@@ -19,180 +14,15 @@ class CategoryManagerScreen extends ConsumerStatefulWidget {
 }
 
 class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
-  final _apiUrlController = TextEditingController();
-  String? _lastLoadedApiUrl;
-  bool _isSavingApiUrl = false;
-
-  @override
-  void dispose() {
-    _apiUrlController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _backupData() async {
-    try {
-      final dbFolder = await getApplicationDocumentsDirectory();
-      final dbPath = p.join(dbFolder.path, 'db.sqlite');
-      final file = File(dbPath);
-
-      if (!await file.exists()) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No database found to backup!')));
-        return;
-      }
-
-      // Share expects XFile
-      await Share.shareXFiles([XFile(dbPath)],
-          text: 'Expense Tracker Backup (db.sqlite)');
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Backup failed: $e')));
-    }
-  }
-
-  Future<void> _restoreData() async {
-    try {
-      final result = await FilePicker.platform.pickFiles();
-      if (result != null && result.files.single.path != null) {
-        final sourcePath = result.files.single.path!;
-        final dbFolder = await getApplicationDocumentsDirectory();
-        final dbPath = p.join(dbFolder.path, 'db.sqlite');
-
-        if (!mounted) return;
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Restore Backup?'),
-            content: const Text(
-                'WARNING: This will overwritten ALL current data. This action cannot be undone.\n\nAre you sure you want to restore?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel')),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Restore'),
-              ),
-            ],
-          ),
-        );
-
-        if (confirm == true) {
-          // Overwrite the file
-          await File(sourcePath).copy(dbPath);
-
-          // Invalidate providers to force reload/re-open logic if possible
-          ref.invalidate(databaseProvider);
-          ref.invalidate(categoriesProvider);
-          ref.invalidate(expensesProvider);
-
-          if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text(
-                  'Restored successfully! Restarting app is recommended.')));
-        }
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Restore failed: $e')));
-    }
-  }
-
-  Future<void> _saveApiUrl() async {
-    final trimmed = _apiUrlController.text.trim();
-    if (trimmed.isNotEmpty && parseStoredOcrApiUrl(trimmed) == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid full http/https API URL.'),
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isSavingApiUrl = true;
-    });
-
-    try {
-      await ref.read(ocrApiUrlControllerProvider.notifier).save(trimmed);
-      if (!mounted) return;
-
-      final message = trimmed.isEmpty
-          ? 'OCR Backend API URL cleared.'
-          : 'OCR Backend API URL saved.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save API URL: $error')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSavingApiUrl = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
-    final ocrApiUrlAsync = ref.watch(ocrApiUrlControllerProvider);
-    final loadedApiUrl = ocrApiUrlAsync.valueOrNull;
-
-    if (loadedApiUrl != _lastLoadedApiUrl) {
-      _lastLoadedApiUrl = loadedApiUrl;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _apiUrlController.value = TextEditingValue(
-          text: loadedApiUrl ?? '',
-          selection: TextSelection.collapsed(
-            offset: (loadedApiUrl ?? '').length,
-          ),
-        );
-      });
-    }
+    final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
-        actions: [
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == 'backup') _backupData();
-              if (value == 'restore') _restoreData();
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'backup',
-                child: Row(
-                  children: [
-                    Icon(Icons.upload, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('Backup Data (Export)')
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'restore',
-                child: Row(
-                  children: [
-                    Icon(Icons.download, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('Restore Data (Import)')
-                  ],
-                ),
-              ),
-            ],
-          )
-        ],
+        title: Text(l10n.categories),
       ),
       body: categoriesAsync.when(
         data: (categories) {
@@ -201,64 +31,16 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
-                color: Colors.grey[100],
-                child: const Text(
-                  "OCR IMPORT",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: Colors.grey),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _apiUrlController,
-                      keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(
-                        labelText: 'OCR Backend API URL',
-                        hintText: 'https://api.example.com/ocr/import',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Save the full backend API URL used for OCR/LLM receipt imports.',
-                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                    ),
-                    if (ocrApiUrlAsync.hasError) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Failed to load saved API URL: ${ocrApiUrlAsync.error}',
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _isSavingApiUrl ? null : _saveApiUrl,
-                        child: Text(
-                          _isSavingApiUrl ? 'Saving...' : 'Save API URL',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                color: Colors.grey[100],
-                child: const Text("CATEGORIES",
+                color: colorScheme.surfaceVariant,
+                child: Text(l10n.categoriesSection,
                     style: TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.grey)),
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.bold,
+                    )),
               ),
               Expanded(
                 child: categories.isEmpty
-                    ? const Center(child: Text('No categories available.'))
+                    ? Center(child: Text(l10n.noCategoriesAvailable))
                     : ListView.builder(
                         itemCount: categories.length,
                         itemBuilder: (context, index) {
@@ -296,26 +78,28 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                               ),
                               title: Text(category.name),
                               trailing: IconButton(
-                                icon: const Icon(Icons.delete,
-                                    color: Colors.grey),
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                                 onPressed: () async {
                                   final confirm = await showDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
-                                      title: const Text('Delete Category?'),
-                                      content: Text(
-                                          'Delete "${category.name}"? Related expenses might be affected.'),
+                                      title: Text(l10n.deleteCategoryTitle),
+                                      content: Text(l10n.deleteCategoryMessage(
+                                          category.name)),
                                       actions: [
                                         TextButton(
                                             onPressed: () =>
                                                 Navigator.pop(context, false),
-                                            child: const Text('Cancel')),
+                                            child: Text(l10n.cancel)),
                                         TextButton(
                                             onPressed: () =>
                                                 Navigator.pop(context, true),
                                             style: TextButton.styleFrom(
                                                 foregroundColor: Colors.red),
-                                            child: const Text('Delete')),
+                                            child: Text(l10n.delete)),
                                       ],
                                     ),
                                   );
@@ -341,7 +125,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, s) => Center(child: Text('Error: $e')),
+        error: (e, s) => Center(child: Text(l10n.errorMessage('$e'))),
       ),
       floatingActionButton: categoriesAsync.when(
         data: (categories) => FloatingActionButton(
@@ -404,25 +188,27 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
     showDialog(
       context: context,
       builder: (context) {
+        final l10n = context.l10n;
+        final colorScheme = Theme.of(context).colorScheme;
         return StatefulBuilder(builder: (context, setState) {
           return AlertDialog(
-            title: Text(isEditing ? 'Edit Category' : 'New Category'),
+            title: Text(isEditing ? l10n.editCategory : l10n.newCategory),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: controller,
-                    decoration: const InputDecoration(
-                      labelText: 'Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.name,
+                      border: const OutlineInputBorder(),
                     ),
                     autofocus: true,
                   ),
                   const SizedBox(height: 16),
-                  const Align(
+                  Align(
                       alignment: Alignment.centerLeft,
-                      child: Text("Pick a Color:")),
+                      child: Text(l10n.pickColor)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -453,15 +239,21 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                             color: color,
                             shape: BoxShape.circle,
                             border: isSelected
-                                ? Border.all(color: Colors.black, width: 2)
+                                ? Border.all(
+                                    color: colorScheme.onSurface,
+                                    width: 2,
+                                  )
                                 : null,
                             // Dim if used
                             boxShadow: isUsed
                                 ? null
                                 : [
                                     if (isSelected)
-                                      const BoxShadow(
-                                          color: Colors.black26, blurRadius: 4)
+                                      BoxShadow(
+                                        color: colorScheme.shadow
+                                            .withOpacity(0.18),
+                                        blurRadius: 4,
+                                      )
                                   ],
                           ),
                           child: isUsed
@@ -477,15 +269,15 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                     }).toList(),
                   ),
                   const SizedBox(height: 16),
-                  const Align(
+                  Align(
                       alignment: Alignment.centerLeft,
-                      child: Text("Pick an Icon:")),
+                      child: Text(l10n.pickIcon)),
                   const SizedBox(height: 8),
                   Container(
                     height: 150, // Limit height for grid
                     width: double.maxFinite,
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey[300]!),
+                      border: Border.all(color: colorScheme.outlineVariant),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: GridView.builder(
@@ -512,7 +304,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? Color(selectedColorValue).withOpacity(0.2)
-                                  : Colors.grey[100],
+                                  : colorScheme.surfaceVariant,
                               borderRadius: BorderRadius.circular(8),
                               border: isSelected
                                   ? Border.all(
@@ -524,7 +316,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                               iconData,
                               color: isSelected
                                   ? Color(selectedColorValue)
-                                  : Colors.grey,
+                                  : colorScheme.onSurfaceVariant,
                             ),
                           ),
                         );
@@ -537,7 +329,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
             actions: [
               TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel')),
+                  child: Text(l10n.cancel)),
               FilledButton(
                 onPressed: () {
                   final name = controller.text.trim();
@@ -550,9 +342,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
 
                   if (isColorTaken) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text(
-                              'Color already taken! Please pick another.')),
+                      SnackBar(content: Text(l10n.colorAlreadyTaken)),
                     );
                     return;
                   }
@@ -576,7 +366,7 @@ class _CategoryManagerScreenState extends ConsumerState<CategoryManagerScreen> {
                   }
                   Navigator.pop(context);
                 },
-                child: Text(isEditing ? 'Save' : 'Add'),
+                child: Text(isEditing ? l10n.save : l10n.add),
               ),
             ],
           );
