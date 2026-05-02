@@ -34,9 +34,7 @@ Receipt scanning requires an OCR backend URL.
 
 The public app does not include a default OCR backend. If you need access to the OCR backend URL, please star this repository and contact me on Telegram:
 
-```text
-Telegram: @Gozilasim
-```
+**Telegram:** [@Gozilasim](https://t.me/Gozilasim)
 
 ## 💡 Why I Built This
 
